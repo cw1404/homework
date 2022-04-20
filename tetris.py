@@ -33,12 +33,10 @@ class Tetris(object):
     def __init__(self,bx,by):
         """
         Initialize the tetris object.
-
         Parameters:
             - bx - number of blocks in x
             - by - number of blocks in y
         """
-        self.by = by
         # Compute the resolution of the play board based on the required number of blocks.
         self.resx = bx*constants.BWIDTH+2*constants.BOARD_HEIGHT+constants.BOARD_MARGIN
         self.resy = by*constants.BHEIGHT+2*constants.BOARD_HEIGHT+constants.BOARD_MARGIN
@@ -56,13 +54,13 @@ class Tetris(object):
         # represents the relative position. The true/false value is used for the configuration of rotation where
         # False means no rotate and True allows the rotation.
         self.block_data = (
-            ([[0,0],[1,0],[2,0],[3,0]],constants.CYAN,True),     # I block 
+            ([[0,0],[1,0],[2,0],[3,0]],constants.RED,True),     # I block 
             ([[0,0],[1,0],[0,1],[-1,1]],constants.GREEN,True),  # S block 
             ([[0,0],[1,0],[2,0],[2,1]],constants.BLUE,True),    # J block
-            ([[0,0],[0,1],[1,0],[1,1]],constants.GOLD,False), # O block
-            ([[-1,0],[0,0],[0,1],[1,1]],constants.RED,True),   # Z block
+            ([[0,0],[0,1],[1,0],[1,1]],constants.ORANGE,False), # O block
+            ([[-1,0],[0,0],[0,1],[1,1]],constants.GOLD,True),   # Z block
             ([[0,0],[1,0],[2,0],[1,1]],constants.PURPLE,True),  # T block
-            ([[0,0],[1,0],[2,0],[0,1]],constants.ORANGE,True),    # L block
+            ([[0,0],[1,0],[2,0],[0,1]],constants.CYAN,True),    # J block
         )
         # Compute the number of blocks. When the number of blocks is even, we can use it directly but 
         # we have to decrese the number of blocks in line by one when the number is odd (because of the used margin).
@@ -93,13 +91,8 @@ class Tetris(object):
                     self.active_block.move(-constants.BWIDTH,0)
                 if ev.key == pygame.K_RIGHT:
                     self.active_block.move(constants.BWIDTH,0)
-                if ev.key == pygame.K_z:
-                    self.active_block.rotate(-1)
-                if ev.key in [pygame.K_x, pygame.K_UP]:
+                if ev.key == pygame.K_LALT:
                     self.active_block.rotate()
-                if ev.key == pygame.K_KP0:
-                    diff = self.get_active_block_diff_to_fixed_block_in_resolution()
-                    self.active_block.move(0,int(min(diff.values()) / constants.BHEIGHT) * constants.BHEIGHT )
                 if ev.key == pygame.K_p:
                     self.pause()
        
@@ -163,7 +156,7 @@ class Tetris(object):
         """
         Print the current state line
         """
-        string = ["{0:<10}".format(self.score)]
+        string = ["SCORE: {0}   SPEED: {1}x".format(self.score,self.speed)]
         self.print_text(string,constants.POINT_MARGIN,constants.POINT_MARGIN)        
 
     def print_game_over(self):
@@ -183,7 +176,6 @@ class Tetris(object):
     def print_text(self,str_lst,x,y):
         """
         Print the text on the X,Y coordinates. 
-
         Parameters:
             - str_lst - list of strings to print. Each string is printed on new line.
             - x - X coordinate of the first string
@@ -209,7 +201,6 @@ class Tetris(object):
     def block_colides(self):
         """
         Check if the block colides with any other block.
-
         The function returns True if the collision is detected.
         """
         for blk in self.blk_list:
@@ -233,7 +224,7 @@ class Tetris(object):
         # Border logic, check if we colide with down border or any
         # other border. This check also includes the detection with other tetris blocks. 
         down_board  = self.active_block.check_collision([self.board_down])
-        any_border  = self.active_block.check_collision([self.board_left,self.board_right])
+        any_border  = self.active_block.check_collision([self.board_left,self.board_up,self.board_right])
         block_any   = self.block_colides()
         # Restore the configuration if any collision was detected
         if down_board or any_border or block_any:
@@ -275,19 +266,16 @@ class Tetris(object):
             # Update the score.
             self.score += self.blocks_in_line * constants.POINT_VALUE 
             # Check if we need to speed up the game. If yes, change control variables
-            """
             if self.score > self.score_level:
                 self.score_level *= constants.SCORE_LEVEL_RATIO
                 self.speed       *= constants.GAME_SPEEDUP_RATIO
                 # Change the game speed
                 self.set_move_timer()
-            """
 
     def remove_line(self,y):
         """
         Remove the line with given Y coordinates. Blocks below the filled
         line are untouched. The rest of blocks (yi > y) are moved one level done.
-
         Parameters:
             - y - Y coordinate to remove.
         """ 
@@ -300,7 +288,6 @@ class Tetris(object):
     def get_blocks_in_line(self,y):
         """
         Get the number of shape blocks on the Y coordinate.
-
         Parameters:
             - y - Y coordinate to scan.
         """
@@ -335,80 +322,14 @@ class Tetris(object):
             self.blk_list.append(self.active_block)
             self.new_block = False
 
-    def get_active_block_bottom_block_height_in_resolution(self):
-        height = {}
-        for rect in self.active_block.shape:
-            try:
-                if height[rect.x] < rect.y:
-                    height[rect.x] = rect.y
-            except KeyError:
-                height[rect.x] = rect.y
-        return height
-
-    def is_lower_than_active_block(self, r):
-        for rect in self.active_block.shape:
-            if r.y < rect.y:
-                return False
-        return True
-
-    def get_fixed_blocks_top_block_height_in_resolution(self):
-        d = {}
-        for blocks in self.blk_list:
-            if self.active_block != blocks:
-                for rect in blocks.shape:
-                    if self.is_lower_than_active_block(rect):
-                        try:
-                            if d[rect.x] > rect.y: #renew height
-                                d[rect.x] = rect.y
-                        except KeyError: #append height
-                            d[rect.x] = rect.y
-        return d
-
-    def get_active_block_diff_to_fixed_block_in_resolution(self):
-        diff = {}
-        act = self.get_active_block_bottom_block_height_in_resolution()
-        fix = self.get_fixed_blocks_top_block_height_in_resolution()
-        bottom_height = self.resy - constants.BOARD_UP_MARGIN
-
-        for x in act.keys():
-            try: #to the fix block top
-                diff[x] = fix[x] - act[x] - constants.MESH_WIDTH
-            except KeyError: #to the screen bottom
-                diff[x] = bottom_height - act[x]
-        return diff
-
-    def get_active_block_bottom_remaining_height_in_resolution(self):
-        bottom_height = self.resy - constants.BOARD_UP_MARGIN
-        h_dict = self.get_fixed_blocks_top_block_height_in_resolution()
-        for rect in self.active_block.shape:
-            try:
-                diff = h_dict[rect.x] - rect.y
-            except KeyError:
-                diff = self.resy - constants.BOARD_UP_MARGIN - rect.y
-            if remaining_height > diff:
-                remaining_height = diff
-        return int(remaining_height / constants.BHEIGHT) - self.active_block.h
-
-    def draw_aiming(self):
-        diff = self.get_active_block_diff_to_fixed_block_in_resolution()
-        diff_min = self.resy
-        for bl in self.active_block.shape:
-            if diff_min > diff[bl.x]:
-                diff_min = diff[bl.x]
-        for bl in self.active_block.shape:
-            shadow = bl.copy()
-            shadow.y += int(diff_min / constants.BHEIGHT) * constants.BHEIGHT
-            pygame.draw.rect(self.screen, constants.WHITE, shadow)
-
     def draw_game(self):
         """
         Draw the game screen.
         """
         # Clean the screen, draw the board and draw
         # all tetris blocks
-        self.screen.fill(constants.GOLD)
+        self.screen.fill(constants.WHITE)
         self.draw_board()
-        self.draw_aiming()
         for blk in self.blk_list:
             blk.draw()
         # Draw the screen buffer
@@ -417,4 +338,4 @@ class Tetris(object):
 if __name__ == "__main__":
     Tetris(24,45).run()
 
-#Special add to try pull requeststetris.py
+#Special add to try pull requests
